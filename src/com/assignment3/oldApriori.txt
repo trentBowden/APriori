@@ -1,0 +1,231 @@
+package com.assignment3;
+
+import java.io.*;
+import java.util.*;
+
+/**
+ * Created by trent on 5/31/2017.
+ * This is for assignment 3
+ * A Priori will work in the following way:
+ * Input: Data set and support value (default given if nothing)
+ * The output will be a subset of items which have support more than S
+ * Method:
+ * Pre: calculate minimum needed from support value and # items
+ * 1. Use a Map to Count the individual items from all baskets
+ * 2. For the items that reach the minimum needed form: [A] [B]
+ * 3. Discard any items that don't reach the minimum needed (put all that satisfy in a vector?)
+ *
+ * 4. Generate candidates from this, count occurrences of these candidates form: [A,B] [A,C]
+ * 5. Repeat the process of using a map to count the individual items from all baskets
+ * 6. Discard any item sets that don't reach the minimum needed (put all that satisfy in a vector?)
+ *
+ *
+ *
+ * Data structures
+ * Initial data:
+ * 55 66 77 88 99
+ * 99 88 44 22
+ *
+ * I want to get frequency of all numbers
+ * = use a Map. (99,2) represents frequency of individual number
+ *
+ * I want a searchable list of each basket
+ * = have an arrayList of Map(int, bool)?
+ * (arr(99,1), arr(99,1)
+ * Do this from the beginning, it solves wanting frequency of numbers from start.
+ */
+public class aPriori {
+    /*
+    *This function will read in the file
+    */
+    public static void inputFile(String inputFile, int supportVal) throws IOException {
+        /*
+        * Let's keep track of the number of individual items, baskets, and total purchases.
+        */
+        int individual_item_count = 0;
+        int basket_count = 0;
+        int total_purchases = 0;
+
+         /*
+         This will have our ENTIRE text file in it, so treat it nicely.
+         */
+        SortedMap< SortedMap<Integer, Boolean> > basket_Array = new TreeMap(SortedMap<Integer, Boolean>);
+
+       /*
+       It's anyone's guess what this is for
+       */
+        SortedMap<Integer, Integer> items = new TreeMap<Integer,Integer>();
+
+         /*
+        This will have the candidates individually with their frequency
+        The candidates within this will have satisfied the support threshold.
+        */
+        TreeMap <Integer, Integer> individualCandidates = new TreeMap<>();
+
+        FileReader in = new FileReader(inputFile);
+        BufferedReader br = new BufferedReader(in);
+        String line;
+
+        /*
+        *Status check
+        */
+        System.out.println("File is being read");
+
+        /*This will traverse through the entire text file, splitting by whitespace*/
+        while ((line = br.readLine()) != null) {
+            /* Split the string into an array containing each item in the basket */
+            String[] tokenArray = line.split("\\s+");
+            /*Iterate through all items in the basket array*/
+            for (String token : tokenArray) {
+                int currentToken = Integer.parseInt(token);
+                /*
+                currentBasket = basket_count
+                basket array is an arraylist of Map(int,int)
+                For this basket, we state the item exists.
+                This will allow for fast lookup of itemsets.
+                */
+                //If there is an array at position "i = basketcount" then add to it, otherwise create an array, add to it.
+                //Make the array instance, then put in our map
+                if (basket_Array.containsKey(basket_count)){
+                    //Get the Map instance for the current basket
+                    basket_Array.get(basket_count).put(currentToken, true);
+                } else {
+                    basket_Array.add(SortedMap < Integer, Boolean > ());
+                }
+
+                /*
+                * This will gather every single number, separated by whitespace
+                * With this number, we will check it in the map for existance
+                * If it exists, we will increment the value by 1.
+                * If it does not exist, we will put it in with a value of 1.
+                * This is done using the Map Merge function, merge(key, intended value if null, protocol if !empty)
+                */
+                items.merge(currentToken, 1, (x,y) -> x+y);
+
+            }
+            /* increase the value of our counter for baskets. */
+            basket_count++;
+        }
+        /*
+        * At this point, we have the following:
+        * items: A sorted map of each individual item and it's frequency
+        *   This allows us to look at each item, checking if it is above frequency threshold
+        * basket_array: An array where each element is a map that represents a basket.
+        *   This allows us to look in all baskets, checking if they have particular items.
+        *
+        * Now we write the first file. This will contain each item, and their frequency
+        * This will also be available in the items map.
+        */
+
+        /*
+        *Status check
+        */
+        System.out.println("Writing items with higher frequency than support threshold to file itemSupport.txt");
+        System.out.println("Writing items with higher frequency than support threshold to individualCandidates map.");
+
+        try (BufferedWriter outBuff = new BufferedWriter(new FileWriter("itemSupport.txt"))) {
+            for (Map.Entry<Integer, Integer>  entry : items.entrySet()) {
+                /*
+                Add to our counters.
+                Each item is +1 individual
+                Item frequency is +1 total purchase
+                */
+                total_purchases += entry.getValue();
+                individual_item_count++;
+                /* The following conversion to string enables us to write to file. */
+                String itemGivenStr = Integer.toString(entry.getKey());
+                String numTimesBoughtStr = Integer.toString(entry.getValue());
+                /* only accepts values larger than the support value, for filtering purposes */
+                if (entry.getValue() > supportVal){
+                    individualCandidates.put(entry.getKey(), entry.getValue());
+                    outBuff.write(itemGivenStr + ": " + numTimesBoughtStr);
+                    outBuff.newLine();
+                }
+            }
+        }
+        in.close();
+
+    /*
+    * From here, we want to compare the individual candidates with the original list.
+    * We will create a "nextK" function, which will take in the following parameters:
+    * 1. The original list of items, called "items" (or the candidates)
+    * 2. The arraylist<map(int,bool)> of baskets. (original, untouched)
+    *
+    * It will work like this:
+    * We want to check if groups of K of the data are found in baskets
+    * So, For each item in the itemset that appears above threshold ( (66,44,55,77,88) )
+    *       aka, iterate through individualCandidates map
+    *       currentValue
+    * We want to check if currentValue AND (OtherValue) are in any baskets
+    * So the output of that will be the array of objects, and what their frequency was (as an array)
+    * Map<Arraylist<int> objects, int frequency_of_that_object)
+    * maybe we should make the original list of items a map<arrayList<int>, int> so we can reuse the nextK function
+    */
+    nextK(individualCandidates, basket_Array, supportVal);
+    }
+
+    public static void nextK (TreeMap <Integer, Integer> candidates,  ArrayList< SortedMap<Integer, Boolean> > basket_Array, int threshold){
+        /*
+        Let's have a Map <ArrayList<int>, int> to store what we want here
+        Each combination of items will be looked for among the baskets
+        If the combination A,B is found in 10 baskets, we will have a result of ((A,B), 10)
+        */
+        TreeMap <ArrayList<Integer>, Integer> itemSet_count = new TreeMap<>();
+
+        //Go through all of the candidates that passed from the first round
+        for (Map.Entry<Integer, Integer>  entry : candidates.entrySet()) {
+            for (Map.Entry<Integer, Integer> nextEntry : candidates.entrySet()) {
+                if (!Objects.equals(entry.getKey(), nextEntry.getKey())) {
+
+                    //Look through each basket, with each combination of items that were found to be above the threshold
+                    for (SortedMap<Integer,Boolean> currentBasket : basket_Array) {
+                        System.out.println("test");
+                        //If we can find both entries in the basket
+                        if (currentBasket.get(entry.getKey()) && currentBasket.get(nextEntry.getKey())){
+                            //Add each entry to an arrayList, and mark their frequency to be +1!
+                            ArrayList<Integer> vals_being_inspected = new ArrayList<Integer>();
+                            vals_being_inspected.add(entry.getKey());
+                            System.out.println(entry.getKey() + entry.getValue());
+                            vals_being_inspected.add(nextEntry.getKey());
+                            itemSet_count.merge(vals_being_inspected, 1, (x,y) -> x+y);
+                        }
+                    }
+                }
+        }
+        }
+        /*
+        * Now we should have our itemSet_count map containing each frequent itemset with 2 values
+        */
+        System.out.println(itemSet_count.size() + " = the size of the itemset");
+        for (Map.Entry<ArrayList<Integer>, Integer>  entry : itemSet_count.entrySet()) {
+            System.out.println(entry.getKey()+ " + "+ entry.getValue());
+        }
+    }
+
+
+    public static void main(String[] args) throws IOException {
+    String filenameGiven ="src/T10I4D100K.dat"; //"src/testData.dat";
+    int supportValue = 1500; // change this if necessary
+    /*
+    * Input argument style: 1. filename (string), 2. support value (integer)
+    * If we have any inputs, the values will be set to those.
+    * Default values are for the testData.dat file and for the support value to be 2.
+    */
+    if (args.length > 0) {
+
+        /*
+        *Status check
+        */
+        System.out.println("Command line arguments detected, changing values from default.");
+
+        if (args[1] != null) {
+            filenameGiven = args[1];
+        } if (args[2] != null) {
+            supportValue =  Integer.parseInt(args[2]);
+        }
+    }
+    inputFile(filenameGiven, supportValue);
+    }
+
+
+}
